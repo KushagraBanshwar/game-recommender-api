@@ -34,7 +34,7 @@ def load_model():
 
 # CONFIG
 SUPABASE_URL = "https://dldlktgtpynkiiidiqwp.supabase.co"
-SUPABASE_KEY = "YOUR_SUPABASE_KEY"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsZGxrdGd0cHlua2lpaWRpcXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0OTM0MzAsImV4cCI6MjA5MTA2OTQzMH0.tDw1GwtYyvdRv1rwUUhEkxMeZwX3qWfeCrFMAfUdCvo"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 

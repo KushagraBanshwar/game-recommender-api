@@ -5,6 +5,7 @@ from supabase import create_client
 from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
 import os
+import uvicorn
 
 app = FastAPI()
 
@@ -33,7 +34,7 @@ def load_model():
 
 # CONFIG
 SUPABASE_URL = "https://dldlktgtpynkiiidiqwp.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsZGxrdGd0cHlua2lpaWRpcXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0OTM0MzAsImV4cCI6MjA5MTA2OTQzMH0.tDw1GwtYyvdRv1rwUUhEkxMeZwX3qWfeCrFMAfUdCvo"
+SUPABASE_KEY = "YOUR_SUPABASE_KEY"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -96,9 +97,5 @@ def recommend(query: Query):
 
 # 🔥 LOCAL RUN SUPPORT (optional)
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", 10000))
-    )
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)

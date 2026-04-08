@@ -2,13 +2,13 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 from supabase import create_client
-import numpy as np
 from fastapi.middleware.cors import CORSMiddleware
+import numpy as np
 import os
-import uvicorn
- 
+
 app = FastAPI()
- 
+
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,64 +16,89 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
- 
-# 🔑 CONFIG
+
+# 🔥 GLOBAL MODEL (initially None)
+model = None
+
+# 🔥 LOAD MODEL AFTER SERVER STARTS
+@app.on_event("startup")
+def load_model():
+    global model
+    try:
+        print("Loading model...")
+        model = SentenceTransformer('all-MiniLM-L6-v2')
+        print("Model loaded successfully ✅")
+    except Exception as e:
+        print("Model failed to load ❌", e)
+
+# CONFIG
 SUPABASE_URL = "https://dldlktgtpynkiiidiqwp.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsZGxrdGd0cHlua2lpaWRpcXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0OTM0MzAsImV4cCI6MjA5MTA2OTQzMH0.tDw1GwtYyvdRv1rwUUhEkxMeZwX3qWfeCrFMAfUdCvo"
- 
+SUPABASE_KEY = "YOUR_SUPABASE_KEY"
+
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
- 
-# 🚀 Load model once
-model = SentenceTransformer('all-MiniLM-L6-v2')
- 
-# 📦 Request format
+
+# Request schema
 class Query(BaseModel):
     prompt: str
- 
-# 🎮 API endpoint
+
+# API endpoint
 @app.post("/recommend")
 def recommend(query: Query):
+    global model
+
+    if model is None:
+        return {"error": "Model still loading, try again in a few seconds"}
+
     user_input = query.prompt
- 
-    # 🔥 Encode query
-    query_embedding = model.encode(user_input, normalize_embeddings=True).tolist()
- 
-    # 🔍 Fetch 50 candidates
+
+    # Encode query
+    query_embedding = model.encode(
+        user_input,
+        normalize_embeddings=True
+    ).tolist()
+
+    # Fetch candidates
     response = supabase.rpc("match_games", {
         "query_embedding": query_embedding,
         "match_count": 50
     }).execute()
- 
+
     results = response.data
- 
+
     final_results = []
- 
+
     for r in results:
-        similarity = r["similarity"]
+        similarity = r.get("similarity", 0)
         recs = r.get("recommendations", 0) or 0
- 
+
         try:
             recs = int(recs)
         except:
             recs = 0
- 
+
         popularity_score = np.log1p(recs)
- 
-        # 🔥 final score
+
+        # 🎯 final hybrid score
         score = (similarity * 0.8) + (popularity_score * 0.2)
- 
+
         final_results.append((r, score))
- 
-    # 🔥 sort
+
+    # sort
     final_results.sort(key=lambda x: x[1], reverse=True)
- 
-    # 🎯 take top 20
+
+    # top 20
     top_games = [r[0] for r in final_results[:20]]
- 
+
     return {
         "results": top_games
     }
- 
+
+
+# 🔥 LOCAL RUN SUPPORT (optional)
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
+    import uvicorn
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 10000))
+    )

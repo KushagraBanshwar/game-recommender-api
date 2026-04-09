@@ -4,8 +4,6 @@ from sentence_transformers import SentenceTransformer
 from supabase import create_client
 from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
-import os
-import uvicorn
 
 app = FastAPI()
 
@@ -18,47 +16,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🔥 GLOBAL MODEL (initially None)
-model = None
+# Load model (HF handles this fine)
+model = SentenceTransformer("paraphrase-MiniLM-L3-v2")
 
-# 🔥 LOAD MODEL AFTER SERVER STARTS
-@app.on_event("startup")
-def load_model():
-    global model
-    try:
-        print("Loading model...")
-        model = SentenceTransformer('all-MiniLM-L6-v2')
-        print("Model loaded successfully ✅")
-    except Exception as e:
-        print("Model failed to load ❌", e)
-
-# CONFIG
+# Supabase
 SUPABASE_URL = "https://dldlktgtpynkiiidiqwp.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsZGxrdGd0cHlua2lpaWRpcXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0OTM0MzAsImV4cCI6MjA5MTA2OTQzMH0.tDw1GwtYyvdRv1rwUUhEkxMeZwX3qWfeCrFMAfUdCvo"
-
+SUPABASE_KEY = "YOUR_SUPABASE_KEY"
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Request schema
 class Query(BaseModel):
     prompt: str
 
-# API endpoint
+@app.get("/")
+def home():
+    return {"status": "API running"}
+
 @app.post("/recommend")
 def recommend(query: Query):
-    global model
-
-    if model is None:
-        return {"error": "Model still loading, try again in a few seconds"}
-
-    user_input = query.prompt
-
-    # Encode query
     query_embedding = model.encode(
-        user_input,
+        query.prompt,
         normalize_embeddings=True
     ).tolist()
 
-    # Fetch candidates
     response = supabase.rpc("match_games", {
         "query_embedding": query_embedding,
         "match_count": 50
@@ -77,25 +56,11 @@ def recommend(query: Query):
         except:
             recs = 0
 
-        popularity_score = np.log1p(recs)
-
-        # 🎯 final hybrid score
-        score = (similarity * 0.8) + (popularity_score * 0.2)
-
+        score = (similarity * 0.8) + (np.log1p(recs) * 0.2)
         final_results.append((r, score))
 
-    # sort
     final_results.sort(key=lambda x: x[1], reverse=True)
 
-    # top 20
-    top_games = [r[0] for r in final_results[:20]]
-
     return {
-        "results": top_games
+        "results": [r[0] for r in final_results[:20]]
     }
-
-
-# 🔥 LOCAL RUN SUPPORT (optional)
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
